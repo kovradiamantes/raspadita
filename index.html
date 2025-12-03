@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Kovra Lucky — Raspadita Gamer (modificado)</title>
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<style>
+  :root{
+    --bg:#081026;
+    --panel:#0e1626;
+    --accent:#7cffb2;
+    --accent2:#4cc9f0;
+    --glow: rgba(124,255,178,0.15);
+    --muted:rgba(255,255,255,0.06);
+    --text:#e9f0ff;
+    --card:#0b1220;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    background: radial-gradient(circle at 10% 10%, #0b1426 0%, #081026 45%, #03040a 100%);
+    color:var(--text);
+    font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+
+  .wrap{
+    width:980px;
+    max-width:calc(100% - 40px);
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:14px;
+    padding:18px;
+    box-shadow: 0 14px 60px rgba(2,6,23,0.7), 0 0 40px var(--glow);
+    border:1px solid rgba(255,255,255,0.03);
+    display:flex;
+    gap:18px;
+  }
+
+  .col-left{ flex:0 0 640px; }
+  header{ display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+  .logo{
+    width:88px;height:88px;border-radius:12px;background:linear-gradient(135deg,#061126,#102236);
+    display:flex;align-items:center;justify-content:center;color:var(--accent); font-weight:900; font-size:22px;
+    box-shadow: 0 8px 28px rgba(76,201,240,0.06), inset 0 -6px 18px rgba(0,0,0,0.6);
+    border:1px solid rgba(255,255,255,0.03);
+  }
+
+  .logo img { width:76px; }
+
+  h1{ margin:0;font-size:20px; letter-spacing:0.6px;}
+  .glitch{ position:relative; display:inline-block; color:var(--text); font-weight:800; font-size:18px}
+  .lead{ color:rgba(233,233,238,0.85); margin:6px 0 12px; font-size:13px }
+
+  .panel{ background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01)); border-radius:12px; padding:14px; border:1px solid var(--muted);}
+
+  .board{
+    display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;
+    padding:12px; background:linear-gradient(180deg, rgba(10,16,30,0.12), rgba(6,10,18,0.06)); border-radius:12px;
+  }
+
+  .tile{
+    position:relative; height:140px; border-radius:12px; overflow:hidden; cursor:pointer;
+    background:linear-gradient(180deg,#0a1b2c,#0f2233); border:2px solid rgba(255,255,255,0.03);
+    display:flex; align-items:center; justify-content:center; color:var(--accent); font-weight:900; font-size:18px;
+    box-shadow: 0 8px 20px rgba(2,8,20,0.6), 0 0 20px rgba(76,201,240,0.02) inset;
+  }
+  .tile::after{ content:''; position:absolute; inset:0; border-radius:12px; pointer-events:none; box-shadow: 0 0 28px rgba(76,201,240,0.03), inset 0 0 40px rgba(76,201,240,0.02); transition: box-shadow 220ms ease; }
+  .tile.revealed::after{ box-shadow: none; }
+
+  .scratch-canvas{ position:absolute; left:0; top:0; width:100%; height:100%; z-index:5; }
+
+  .meta-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:10px }
+  .btn{ padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:var(--text); font-weight:800; cursor:pointer }
+  .btn.primary{ background:linear-gradient(90deg,var(--accent),var(--accent2)); color:#041022; border:none; box-shadow:0 8px 30px rgba(124,255,178,0.06); }
+
+  .right-col{ width:320px; flex:0 0 320px; }
+  .info-card{ background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.006)); padding:12px; border-radius:12px; border:1px solid var(--muted) }
+
+  .status{ margin-top:12px; padding:10px; border-radius:8px; font-weight:700; text-align:center; background:linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.18)); border:1px solid rgba(255,255,255,0.03) }
+
+  .muted{ color:rgba(233,233,238,0.75); font-size:13px }
+
+  .usedBadge{ display:inline-block; padding:6px 8px; background:rgba(255,0,0,0.06); color:#ff9f9f; border-radius:8px; font-weight:800 }
+
+  canvas.confetti{ position:fixed; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:9999; }
+
+  .history{ margin-top:10px; font-size:13px; max-height:240px; overflow:auto }
+  .history pre{ background:rgba(0,0,0,0.15); padding:8px; border-radius:8px }
+
+  @media (max-width:960px){ .wrap{ flex-direction:column; width:100% } .col-left,.right-col{ width:100%; flex:unset } }
+</style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="col-left">
+      <header>
+        <div class="logo"><img src="https://raw.githubusercontent.com/kovradiamantes/ranking/main/imagenes/logokovral-05.png" alt="Logo"></div>
+        <div>
+          <div class="glitch">KOVRA LUCKY — Raspadita Gamer</div>
+          <div class="lead">Rasca <strong>exactamente 3</strong> casillas por intento. Cada intento vale <strong>5 puntos</strong>. 3 iguales = premio completo. 2 iguales = mitad.</div>
+        </div>
+      </header>
+
+      <div class="panel">
+        <div class="board" id="board" aria-live="polite"></div>
+
+        <div class="meta-row">
+          <div class="muted">Seleccionadas: <strong id="count">0</strong>/3</div>
+          <div style="display:flex;gap:8px;">
+            <button id="captureBtn" class="btn">📸 Ver Resultado</button>
+            <button id="helpBtn" class="btn">?</button>
+          </div>
+        </div>
+
+        <div id="status" class="status">Esperando jugada...</div>
+      </div>
+    </div>
+
+
+    <div class="right-col">
+
+      <div id="tokenInfo" style="margin-top:10px;font-size:15px;text-align:center;color:#fff;">
+         <div id="playsInfo">Intentos: 0/0</div>
+         <div id="pointsInfo">Puntos: 0</div>
+         <div id="accumulatedInfo">Premios acumulados: 0 💎</div>
+      </div>
+
+      <div class="info-card">
+        <h3 style="margin:0 0 8px;color:var(--accent)">Pasos para reclamar premio:</h3>
+        <div class="muted">Solo si conseguiste ganar diamantes sigue los siguientes pasos:
+	<br>
+	<br>
+	<b>•</b>Presiona en "Enviar Resultados" para que se envíe automáticamente el detalle al admin.<br>
+          	<b>•</b>Si falla el envío automático se abrirá una ventana con opciones para enviar por WhatsApp o correo.<br>
+          	<b>•</b>También puedes copiar el enlace y enviar.
+        </div>
+      
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <div class="muted">Admin:</div>
+        <div style="margin-top:6px">
+          <code style="background:#050407;padding:8px;border-radius:6px;display:block">Kovra Game</code>
+          <div class="muted" style="margin-top:6px">Si tienes dudas contacta al admin que te vendió el token.</div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;flex-direction:column">
+          <button id="sendResultsBtn" class="btn primary">Enviar Resultados (al admin)</button>
+          <button id="shareBtn" class="btn">Compartir enlace (copiar)</button>
+        </div>
+
+        <div style="margin-top:12px" class="muted">
+          Nota: un intento = rascar 3 casillas. Cada $1 = 10 puntos. Cada intento cuesta 5 puntos (2 intentos por $1).
+        </div>
+
+        <div class="history" id="history"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <canvas class="confetti" id="confettiCanvas"></canvas>
+
+<script>
+/* ====================================
+   LÓGICA ADAPTADA A REQUERIMIENTOS
+   - Admin puede generar token con puntos: ?admin=KEY&token=ABC&points=20
+   - Cada 10 puntos = 2 intentos (5 puntos por intento)
+   - Estado guarda puntos, attemptsLeft, history
+   - Plan de cada intento: control interno para decidir full/half/none
+   - Premios por casilla: 1..7 diamantes (valores pequeños)
+*/
+
+const ADMIN_KEY = "kovrarifa2025"; // deja igual o cambia
+const STORAGE_KEY = "__rovix_tokens_v3__";
+const WHATSAPP_NUMBER = "+51997087640";
+const ADMIN_EMAIL = "kovra.diamantes@gmail.com"; // reemplaza por correo real si deseas
+const ADMIN_SEND_URL = null; // Si tienes un endpoint server para recibir resultados, ponlo aquí (POST JSON: {token, details})
+
+/* helpers localStorage */
+function loadState(){ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); }
+function saveState(s){ localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+
+function ensureToken(t){ const s = loadState(); if(!s[t]) s[t] = {points:0, attemptsTotal:0, attemptsUsed:0, prizes:[], history:[]}; saveState(s); }
+function getTokenState(t){ const s = loadState(); return s[t]; }
+
+function consumeAttempt(t, prize, detail){ const s = loadState(); const st = s[t]; if(!st) return; st.attemptsUsed = (st.attemptsUsed||0)+1; st.prizes.push(prize); st.history = st.history||[]; st.history.push(detail); st.points = Math.max(0, (st.points||0) - 5); saveState(s); }
+
+function setTokenPoints(t, pts){ const s = loadState(); s[t] = {points: pts, attemptsTotal: Math.floor(pts/5), attemptsUsed:0, prizes:[], history:[]}; saveState(s); }
+
+/* URL params */
+const params = new URLSearchParams(location.search);
+const tokenParam = params.get('token');
+const adminParam = params.get('admin');
+
+/* ADMIN: crear token con puntos */
+if(adminParam && adminParam === ADMIN_KEY){
+  const t = params.get('token');
+  const pts = Number(params.get('points')) || 0;
+  if(t){
+    setTokenPoints(t, pts);
+    const attempts = Math.floor(pts/5);
+    document.body.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--text);font-family:Inter;padding:24px">
+      <div style="background:#071027;padding:22px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);text-align:center">
+        <h2 style="color:var(--accent)">✔ Token ${t} configurado</h2>
+        <p>Puntos: ${pts}</p>
+        <p>Intentos disponibles: ${attempts}</p>
+        <a href="${location.pathname}?token=${t}" style="display:inline-block;margin-top:12px;padding:10px 14px;border-radius:8px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#041022;font-weight:800;text-decoration:none">Abrir vista comprador</a>
+      </div>
+    </div>`;
+    throw "";
+  }
+}
+
+/* validate token */
+if(!tokenParam){ document.body.innerHTML = `<div style="min-height:70vh;display:flex;align-items:center;justify-content:center"><h2>❌ Falta token. Pide tu enlace al administrador.</h2></div>`; throw ""; }
+
+ensureToken(tokenParam);
+const tokenState = getTokenState(tokenParam);
+if((tokenState.attemptsUsed||0) >= (tokenState.attemptsTotal||0)){
+  document.body.innerHTML = `<div style="min-height:70vh;display:flex;align-items:center;justify-content:center">
+    <div>
+      <h2>🛑 Límite de jugadas alcanzado</h2>
+      <p>Has usado todas tus ${tokenState.attemptsTotal||0} jugadas.</p>
+      <p>Premios acumulados: ${tokenState.prizes.reduce((a,b)=>a+b,0)} 💎</p>
+      <p>Solicita más token al admin para seguir jugando.</p>
+    </div>
+  </div>`;
+  throw "";
+}
+
+/* actualizar display */
+function updateTokenDisplay(){
+  const state = getTokenState(tokenParam);
+  document.getElementById('playsInfo').textContent = `Intentos: ${state.attemptsUsed||0}/${state.attemptsTotal||0}`;
+  document.getElementById('pointsInfo').textContent = `Puntos: ${state.points||0}`;
+  const total = (state.prizes||[]).reduce((a,b)=>a+b,0);
+  document.getElementById('accumulatedInfo').textContent = `Premios acumulados: ${total} 💎`;
+  renderHistory();
+}
+
+updateTokenDisplay();
+
+/* PRIZE logic: values 1..7 */
+function randVal(){ return Math.floor(Math.random()*7)+1; }
+
+let boardPlan = null; // plan for the current attempt
+let revealedCount = 0;
+let revealedPrizes = [];
+
+function buildPlan(){
+  // build a base grid of 9 random values
+  const grid = Array.from({length:9}, ()=> randVal());
+  // decide internal outcome (full, half, none)
+  const r = Math.random();
+  const outcome = r < 0.18 ? 'full' : (r < 0.50 ? 'half' : 'none');
+  // pick a target value (what the first scratch shows)
+  const targetValue = randVal();
+  return {grid, outcome, targetValue};
+}
+
+/* render board from plan (values may be adjusted when first reveal occurs) */
+const board = document.getElementById('board');
+const countEl = document.getElementById('count');
+const statusEl = document.getElementById('status');
+
+function renderBoardFromGrid(grid){
+  board.innerHTML = '';
+  revealedCount = 0;
+  revealedPrizes = [];
+  countEl.textContent = revealedCount;
+  statusEl.textContent = 'Esperando jugada...';
+  for(let i=0;i<9;i++){
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.dataset.index = i;
+    tile.dataset.value = grid[i];
+    tile.innerHTML = `<div style="z-index:2;pointer-events:none"><div style="font-size:13px;opacity:0.9">Casilla ${i+1}</div></div>`;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'scratch-canvas';
+    tile.appendChild(canvas);
+    board.appendChild(tile);
+    requestAnimationFrame(()=> initScratchCanvas(tile, canvas));
+  }
+}
+
+function startNewAttempt(){
+  boardPlan = buildPlan();
+  // use the plan.grid as initial values
+  renderBoardFromGrid(boardPlan.grid.slice());
+}
+
+startNewAttempt();
+
+/* SCRATCH implementation (reused with small tweaks) */
+const SCRATCH_RADIUS = 20;
+const REVEAL_THRESHOLD = 0.30;
+
+function initScratchCanvas(tile, canvas){
+  const rect = tile.getBoundingClientRect();
+  const DPR = devicePixelRatio || 1;
+
+  canvas.width = Math.ceil(rect.width * DPR);
+  canvas.height = Math.ceil(rect.height * DPR);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+
+  const w = rect.width;
+  const h = rect.height;
+
+  // draw metallic cover
+  const g = ctx.createLinearGradient(0,0,w, h);
+  g.addColorStop(0, '#b6b6b6');
+  g.addColorStop(0.5, '#9aa6b8');
+  g.addColorStop(1, '#b6d8ef');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,w,h);
+
+  
+  // ===============================
+  // 🔥 LABEL RESPONSIVE (APLICADO)
+  // ===============================
+  const dynamicFontSize = Math.max(12, Math.min(w, h) * 0.18);  
+  // Ajusta 0.18 si quieres más grande o más pequeño
+  
+  ctx.fillStyle = '#061022';
+  ctx.font = `700 ${dynamicFontSize}px Inter, Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('💎KOVRA💎', w / 2, h / 2);
+
+  // Activamos el modo scratch
+  ctx.globalCompositeOperation = 'destination-out';
+
+
+  // ===============================
+  // SCRATCH LOGIC (igual que antes)
+  // ===============================
+  let isDown = false;
+  let lastX = 0, lastY = 0;
+
+  function getPointer(e){
+    const evt = (e.touches && e.touches[0])? e.touches[0] : e;
+    const r = canvas.getBoundingClientRect();
+    return { x: (evt.clientX - r.left), y: (evt.clientY - r.top) };
+  }
+
+  function eraseAt(x,y){
+    ctx.beginPath();
+    ctx.arc(x, y, SCRATCH_RADIUS, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawLine(x1,y1,x2,y2){
+    const dx = x2 - x1, dy = y2 - y1;
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.ceil(dist / (SCRATCH_RADIUS / 2));
+    for(let i = 0; i <= steps; i++){
+      const t = i / steps;
+      eraseAt(x1 + dx*t, y1 + dy*t);
+    }
+  }
+
+  function pointerDown(e){
+    if(revealedCount >= 3) return;
+    e.preventDefault();
+    isDown = true;
+    const p = getPointer(e);
+    lastX = p.x;
+    lastY = p.y;
+    eraseAt(lastX, lastY);
+  }
+
+  function pointerMove(e){
+    if(!isDown) return;
+    e.preventDefault();
+    const p = getPointer(e);
+    drawLine(lastX, lastY, p.x, p.y);
+    lastX = p.x;
+    lastY = p.y;
+  }
+
+  function pointerUp(e){
+    if(!isDown) return;
+    isDown = false;
+    const cleared = computeClearedRatioCanvas(canvas);
+    if(cleared >= REVEAL_THRESHOLD){
+      revealTile(tile, canvas);
+    }
+  }
+
+  // Eventos
+  canvas.addEventListener('pointerdown', pointerDown);
+  window.addEventListener('pointermove', pointerMove);
+  window.addEventListener('pointerup', pointerUp);
+
+  canvas.addEventListener('touchstart', pointerDown, {passive:false});
+  canvas.addEventListener('touchmove', pointerMove, {passive:false});
+  window.addEventListener('touchend', pointerUp);
+
+  canvas.addEventListener('click', (ev)=>{
+    if(revealedCount >= 3) return;
+    const p = getPointer(ev);
+    drawLine(p.x-3, p.y-3, p.x+3, p.y+3);
+    const cleared = computeClearedRatioCanvas(canvas);
+    if(cleared >= REVEAL_THRESHOLD){
+      revealTile(tile, canvas);
+    }
+  });
+}
+
+
+
+
+
+function initAllScratchTiles() {
+  document.querySelectorAll(".tile").forEach(tile => {
+    const canvas = tile.querySelector("canvas");
+    initScratchCanvas(tile, canvas);
+  });
+}
+
+let resizeTimeout;
+
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    initAllScratchTiles();
+  }, 150);
+});
+
+
+
+
+// Cuando la página carga, se inicializa todo
+window.addEventListener("DOMContentLoaded", initAllScratchTiles);
+
+
+
+
+
+
+
+
+
+function computeClearedRatioCanvas(canvas){ try{ const cw = canvas.width; const ch = canvas.height; const ctx = canvas.getContext('2d'); const img = ctx.getImageData(0,0, cw, ch); const step = Math.max(6, Math.floor(6 * (devicePixelRatio || 1))); let cleared = 0, total = 0; for(let y=0; y<ch; y+=step){ for(let x=0; x<cw; x+=step){ const idx = (y * cw + x) * 4; const a = img.data[idx+3]; total++; if(a === 0) cleared++; } } return cleared / total; }catch(e){ console.error('computeCleared error', e); return 0; } }
+
+function revealTile(tile, canvas){ if(tile.classList.contains('revealed')) return; tile.classList.add('revealed'); if(canvas && canvas.remove) canvas.remove(); revealedCount++; countEl.textContent = revealedCount; const idx = Number(tile.dataset.index);
+  // When first reveal: enforce plan
+  if(revealedCount === 1){
+    // Force the first revealed tile to show the plan.targetValue (so user sees target)
+    tile.dataset.value = boardPlan.targetValue;
+    // now modify underlying grid according to outcome
+    applyOutcomePlan(idx);
+  }
+  const value = Number(tile.dataset.value);
+  tile.style.color = '#041022';
+  tile.innerHTML = `<div style="z-index:2;text-align:center"><div style="font-size:20px;color:var(--accent);font-weight:900">${value} 💎</div></div>`;
+  revealedPrizes.push({index: idx, value});
+  if(revealedCount === 3) finalizeGame(); }
+
+function applyOutcomePlan(firstIndex){
+  // Find indices not revealed
+  const candidates = [];
+  for(let i=0;i<9;i++) if(!document.querySelector(`.tile[data-index='${i}']`).classList.contains('revealed')) candidates.push(i);
+  // we will pick positions among remaining to match
+  if(boardPlan.outcome === 'full'){
+    // make two other tiles equal to target
+    shuffleArray(candidates);
+    const pick = candidates.slice(0,2);
+    pick.forEach(i => { const t = document.querySelector(`.tile[data-index='${i}']`); if(t) t.dataset.value = boardPlan.targetValue; });
+  } else if(boardPlan.outcome === 'half'){
+    // make exactly one other tile equal to target
+    shuffleArray(candidates);
+    const pick = candidates.slice(0,1);
+    pick.forEach(i => { const t = document.querySelector(`.tile[data-index='${i}']`); if(t) t.dataset.value = boardPlan.targetValue; });
+    // leave the rest random (already random)
+  } else {
+    // none: leave as-is
+  }
+}
+
+/* finalize logic: compute counts, award prize, record history */
+function finalizeGame(){
+  const counts = {};
+  revealedPrizes.forEach(p=> counts[p.value] = (counts[p.value]||0)+1);
+  let bestCount = 0, bestValue = 0;
+  for(const v in counts){ if(counts[v] > bestCount){ bestCount = counts[v]; bestValue = Number(v); } }
+  let prizeWon = 0; let message = '';
+  if(bestCount === 3){ prizeWon = bestValue; message = `🎉 ¡FELICIDADES! Ganaste ${prizeWon} 💎 (Premio completo)`; showConfetti(300); }
+  else if(bestCount === 2){ prizeWon = Math.floor(bestValue/2); message = `✨ Ganaste la mitad: ${prizeWon} 💎`; showConfetti(140); }
+  else { message = `😅 No ganaste esta vez. ¡Sigue intentando!`; }
+
+  // build detail line for history
+  const detail = {
+    timestamp: new Date().toISOString(),
+    picks: revealedPrizes.slice(),
+    bestCount, bestValue, prizeWon, outcome: boardPlan.outcome
+  };
+
+  consumeAttempt(tokenParam, prizeWon, detail);
+  updateTokenDisplay();
+
+  statusEl.innerHTML = `${message}<br><small>Premios acumulados: ${getTokenState(tokenParam).prizes.reduce((a,b)=>a+b,0)} 💎</small>`;
+
+  // if still have attempts, auto reset board immediately so user can play (no waiting)
+  if(getTokenState(tokenParam).attemptsUsed < getTokenState(tokenParam).attemptsTotal){
+    setTimeout(()=> startNewAttempt(), 1200);
+  } else {
+    // no more attempts -> show summary and keep board disabled
+    setTimeout(()=> showSummaryAndFinish(), 900);
+  }
+}
+
+function showSummaryAndFinish(){
+  const s = getTokenState(tokenParam);
+  const total = s.prizes.reduce((a,b)=>a+b,0);
+  statusEl.innerHTML += `<br><strong>Resumen final:</strong> ${total} 💎`;
+}
+
+/* reset board: not used since we create new attempt automatically */
+function shuffleArray(a){ for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
+
+/* ========== SEND RESULTS (texto plano) ========== */
+/* Construye el texto formateado tal como pediste
+   Ejemplo de salida:
+📌 Token del jugador: PIRATA
+📅 Fecha: 02/12/2025 — 00:23:50
+
+🟦 Intento 1
+Cartas elegidas: 6, 4, 5
+Monto repetido: Ninguno (0 coincidencias)
+Premio: ❌ Sin premio
+*/
+function pad(n){ return (n<10? '0'+n : ''+n); }
+
+function formatTimestamp(iso){
+  const d = new Date(iso);
+  const day = pad(d.getDate());
+  const month = pad(d.getMonth()+1);
+  const year = d.getFullYear();
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  return `${day}/${month}/${year} — ${hh}:${mm}:${ss}`;
+}
+
+function formatAttemptText(item, idx){
+  // picks values array
+  const picksVals = (item.picks || []).map(p=>p.value);
+  const picksLine = picksVals.join(', ');
+
+  // determine repeated value and count
+  const counts = {};
+  for(const v of picksVals) counts[v] = (counts[v]||0)+1;
+  let bestVal=null, bestCnt=0;
+  for(const k in counts){ if(counts[k] > bestCnt){ bestCnt = counts[k]; bestVal = k; } }
+
+  let repeatedLine = '';
+  if(bestCnt <= 1){
+    repeatedLine = 'Ninguno (0 coincidencias)';
+  } else {
+    repeatedLine = `${bestVal}💎 (${bestCnt} coincidencia${bestCnt>1? 's' : ''})`;
+  }
+
+  // prize
+  const prizeLine = (item.prizeWon && item.prizeWon>0) ? `${item.prizeWon}💎` : '❌ Sin premio';
+
+  // optional type/outcome
+  const tipoLine = item.outcome ? `Tipo: ${item.outcome}` : '';
+
+  // Build block
+  let txt = `\n🟦 Intento ${idx}\n`;
+  txt += `Cartas elegidas: ${picksLine}\n`;
+  txt += `Monto repetido: ${repeatedLine}\n`;
+  txt += `Premio: ${prizeLine}\n`;
+  if(tipoLine) txt += `${tipoLine}\n`;
+  return txt;
+}
+
+function buildFormattedDetails(){
+  const s = getTokenState(tokenParam);
+  const nowIso = new Date().toISOString();
+  const headerDate = formatTimestamp(nowIso);
+  let out = `📌 Token del jugador: ${tokenParam}\n📅 Fecha: ${headerDate}\n\n`;
+  const history = (s.history||[]).slice();
+  if(!history.length){
+    out += '— No hay intentos guardados —\n';
+    return out;
+  }
+  // order: Intento 1 = oldest -> newest
+  history.forEach((h, i) => {
+    // i starts 0 -> Intento 1
+    const idx = i+1;
+    out += formatAttemptText(h, idx) + '\n';
+  });
+  return out.trim();
+}
+
+/* sendResults: intenta EmailJS (automático) o fallback a mailto/wa */
+async function sendResults(){
+  try{
+    const detailsText = buildFormattedDetails();
+
+    // Si ADMIN_SEND_URL está configurado, intenta enviarlo ahí primero
+    if(ADMIN_SEND_URL){
+      try{
+        await fetch(ADMIN_SEND_URL, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ token: tokenParam, details: detailsText })
+        });
+        alert('Resultados enviados al administrador (endpoint).');
+        return;
+      }catch(e){
+        console.warn('Error enviando al endpoint', e);
+      }
+    }
+
+    // -------- EMAILJS AUTOMÁTICO --------
+    try{
+      await emailjs.send("service_2hz94wg", "template_c75ox98", {
+        token: tokenParam,
+        details: detailsText
+      });
+
+      alert('📩 Resultados enviados correctamente al administrador.');
+      return;
+
+    }catch(emailErr){
+      console.warn('EmailJS falló:', emailErr);
+    }
+
+    // -------- FALLBACK (solo si EmailJS falla) --------
+    const bodyEncoded = encodeURIComponent(detailsText);
+    const wa = `https://wa.me/${WHATSAPP_NUMBER.replace(/\D/g,'')}?text=${encodeURIComponent('Hola, te comparto mi resultado. Token: '+tokenParam + '\n\n' + detailsText)}`;
+    const mailto = `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent('Resultados Kovra Lucky — Token '+tokenParam)}&body=${bodyEncoded}`;
+
+    const win = window.open('', '_blank');
+    win.document.write(`
+      <div style="background:#07142a;padding:18px;min-height:100vh;color:#fff;font-family:Inter">
+        <h2 style="color:var(--accent)">Enviar resultados</h2>
+        <p>Puedes copiar/pegar el detalle o usar una de las opciones:</p>
+        <p style="white-space:pre-wrap;background:#05060a;padding:12px;border-radius:8px;">${escapeHtml(detailsText)}</p>
+        <p style="margin-top:12px">
+          <a href="${wa}" target="_blank" style="display:inline-block;padding:10px 14px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#041022;border-radius:8px;text-decoration:none;font-weight:800;margin-right:8px">Enviar por WhatsApp</a>
+          <a href="${mailto}" target="_blank" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#0b1220;color:var(--accent);text-decoration:none;font-weight:800">Enviar por Correo</a>
+        </p>
+      </div>
+    `);
+    win.document.close();
+
+  }catch(err){
+    alert('Error al preparar/enviar resultados: '+(err.message||err));
+    console.error(err);
+  }
+}
+
+
+/* small helper to escape HTML for preview window */
+function escapeHtml(str){
+  return (str+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+/* confetti */
+const confettiCanvas = document.getElementById('confettiCanvas');
+const confCtx = confettiCanvas.getContext('2d');
+function resizeConfetti(){ confettiCanvas.width = innerWidth; confettiCanvas.height = innerHeight; }
+addEventListener('resize', resizeConfetti);
+resizeConfetti();
+let particles = [];
+function showConfetti(n=200){ particles = []; for(let i=0;i<n;i++){ particles.push({ x: Math.random()*confettiCanvas.width, y: Math.random()*-confettiCanvas.height*0.5, vx: (Math.random()-0.5)*6, vy: Math.random()*6+2, size: Math.random()*8+4, life: Math.random()*80+50, color: `hsl(${Math.floor(Math.random()*360)} 90% 60%)` }); } requestAnimationFrame(confettiTick); }
+function confettiTick(){ confCtx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height); for(let i=particles.length-1;i>=0;i--){ const p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; confCtx.fillStyle = p.color; confCtx.fillRect(p.x, p.y, p.size, p.size*0.6); if(p.life<=0 || p.y>confettiCanvas.height+50) particles.splice(i,1); } if(particles.length>0) requestAnimationFrame(confettiTick); }
+
+/* help & share buttons */
+document.getElementById('helpBtn').addEventListener('click', ()=>{ alert('Rasca con el dedo o ratón. Solo puedes revelar 3 casillas por intento. Si obtienes 3 iguales ganas completo; 2 iguales ganan la mitad. Cada intento cuesta 5 puntos.'); });
+document.getElementById('shareBtn').addEventListener('click', ()=>{ const link = location.origin + location.pathname + '?token=' + tokenParam; navigator.clipboard.writeText(link).then(()=> alert('Enlace copiado al portapapeles:\n' + link)); });
+
+/* enviar results button binding */
+document.getElementById('sendResultsBtn').addEventListener('click', ()=>{ sendResults(); });
+
+/* capture button -> muestra ventana con el detalle (vista previa) */
+document.getElementById('captureBtn').addEventListener('click', ()=> {
+  const text = buildFormattedDetails();
+  const win = window.open('', '_blank');
+  win.document.write(`<div style="background:#07142a;padding:18px;min-height:100vh;color:#fff;font-family:Inter">
+    <h2 style="color:var(--accent)">Vista previa: Resultado</h2>
+    <pre style="background:#05060a;padding:12px;border-radius:8px;color:#fff;white-space:pre-wrap;">${escapeHtml(text)}</pre>
+    <p style="margin-top:12px"><button onclick="window.print()" style="padding:8px 10px;border-radius:8px;background:linear-gradient(90deg,#7cffb2,#4cc9f0);border:none;font-weight:800">Imprimir / Guardar PDF</button></p>
+  </div>`);
+  win.document.close();
+});
+
+/* history render */
+function renderHistory(){ const s = getTokenState(tokenParam); const el = document.getElementById('history'); if(!s.history || !s.history.length){ el.innerHTML = '<div class="muted">Aún no has jugado.</div>'; return; } let html = '<pre>'; s.history.slice().forEach((h,i)=>{ const picks = h.picks.map(p=>`${p.value}💎`).join(' | '); html += `• ${i+1}: ${picks} | ${h.bestCount} aciertos | Premio: ${h.prizeWon || h.prizeWon===0? h.prizeWon : ''}💎\n`; }); html += '</pre>'; el.innerHTML = html; }
+
+renderHistory();
+
+</script>
+
+<!-- EMAILJS -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+  (function() {
+    emailjs.init("CpWzPvZWNh_Lr3in4"); // PUBLIC KEY (ya proporcionada)
+  })();
+</script>
+
+</body>
+</html>
