@@ -176,21 +176,33 @@
 */
 
 const ADMIN_KEY = "kovrarifa2025"; // deja igual o cambia
-const STORAGE_KEY = "__rovix_tokens_v3__";
+
 const WHATSAPP_NUMBER = "+51997087640";
 const ADMIN_EMAIL = "kovra.diamantes@gmail.com"; // reemplaza por correo real si deseas
 const ADMIN_SEND_URL = null; // Si tienes un endpoint server para recibir resultados, ponlo aquí (POST JSON: {token, details})
 
-/* helpers localStorage */
-function loadState(){ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); }
-function saveState(s){ localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
 
-function ensureToken(t){ const s = loadState(); if(!s[t]) s[t] = {points:0, attemptsTotal:0, attemptsUsed:0, prizes:[], history:[]}; saveState(s); }
-function getTokenState(t){ const s = loadState(); return s[t]; }
 
-function consumeAttempt(t, prize, detail){ const s = loadState(); const st = s[t]; if(!st) return; st.attemptsUsed = (st.attemptsUsed||0)+1; st.prizes.push(prize); st.history = st.history||[]; st.history.push(detail); st.points = Math.max(0, (st.points||0) - 5); saveState(s); }
+// ✅ URL DE TU GOOGLE APP SCRIPT (PEGA AQUÍ TU URL REAL)
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwHoiRTSOn4E-UjNm3h-dEsp_sOno6t7wjv-u0YC3ikxZpPpiP9J4RZ5trTjqCJvB6y/exec";
 
-function setTokenPoints(t, pts){ const s = loadState(); s[t] = {points: pts, attemptsTotal: Math.floor(pts/5), attemptsUsed:0, prizes:[], history:[]}; saveState(s); }
+
+// ✅ Estado en memoria (YA NO usamos LocalStorage)
+let SHEET_STATE = {
+  puntos: 0,
+  intentosTotal: 0,
+  intentosUsados: 0,
+  prizes: [],
+  history: []
+};
+
+
+
+
+
+
+
+
 
 /* URL params */
 const params = new URLSearchParams(location.search);
@@ -202,7 +214,7 @@ if(adminParam && adminParam === ADMIN_KEY){
   const t = params.get('token');
   const pts = Number(params.get('points')) || 0;
   if(t){
-    setTokenPoints(t, pts);
+    
     const attempts = Math.floor(pts/5);
     document.body.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--text);font-family:Inter;padding:24px">
       <div style="background:#071027;padding:22px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);text-align:center">
@@ -219,27 +231,52 @@ if(adminParam && adminParam === ADMIN_KEY){
 /* validate token */
 if(!tokenParam){ document.body.innerHTML = `<div style="min-height:70vh;display:flex;align-items:center;justify-content:center"><h2>❌ Falta token. Pide tu enlace al administrador.</h2></div>`; throw ""; }
 
-ensureToken(tokenParam);
-const tokenState = getTokenState(tokenParam);
-if((tokenState.attemptsUsed||0) >= (tokenState.attemptsTotal||0)){
-  document.body.innerHTML = `<div style="min-height:70vh;display:flex;align-items:center;justify-content:center">
-    <div>
-      <h2>🛑 Límite de jugadas alcanzado</h2>
-      <p>Has usado todas tus ${tokenState.attemptsTotal||0} jugadas.</p>
-      <p>Premios acumulados: ${tokenState.prizes.reduce((a,b)=>a+b,0)} 💎</p>
-      <p>Solicita más token al admin para seguir jugando.</p>
-    </div>
-  </div>`;
-  throw "";
+
+// ✅ VALIDAR TOKEN DESDE GOOGLE SHEETS
+async function validarTokenDesdeSheet(){
+  const res = await fetch(`${GAS_URL}?action=validateToken&token=${tokenParam}`);
+  const data = await res.json();
+
+  if(data.status === "NOT_FOUND"){
+    document.body.innerHTML = `<h2>❌ Token no existe</h2>`;
+    throw "";
+  }
+
+  if(data.status === "USADO"){
+    document.body.innerHTML = `<h2>🛑 Este token ya fue usado</h2>`;
+    throw "";
+  }
+
+  // ✅ Guardamos datos reales del Sheet
+  SHEET_STATE.puntos = data.puntos;
+  SHEET_STATE.intentosTotal = data.intentos;
+  SHEET_STATE.intentosUsados = 0;
+  SHEET_STATE.prizes = [];
+  SHEET_STATE.history = [];
+
+  updateTokenDisplay();
 }
+
+(async () => {
+  await validarTokenDesdeSheet();
+})();
+
+
+
+
 
 /* actualizar display */
 function updateTokenDisplay(){
-  const state = getTokenState(tokenParam);
-  document.getElementById('playsInfo').textContent = `Intentos: ${state.attemptsUsed||0}/${state.attemptsTotal||0}`;
-  document.getElementById('pointsInfo').textContent = `Puntos: ${state.points||0}`;
-  const total = (state.prizes||[]).reduce((a,b)=>a+b,0);
-  document.getElementById('accumulatedInfo').textContent = `Premios acumulados: ${total} 💎`;
+  document.getElementById('playsInfo').textContent =
+    `Intentos: ${SHEET_STATE.intentosUsados}/${SHEET_STATE.intentosTotal}`;
+
+  document.getElementById('pointsInfo').textContent =
+    `Puntos: ${SHEET_STATE.puntos}`;
+
+  const total = SHEET_STATE.prizes.reduce((a,b)=>a+b,0);
+  document.getElementById('accumulatedInfo').textContent =
+    `Premios acumulados: ${total} 💎`;
+
   renderHistory();
 }
 
@@ -440,7 +477,12 @@ window.addEventListener("resize", () => {
 
 
 // Cuando la página carga, se inicializa todo
-window.addEventListener("DOMContentLoaded", initAllScratchTiles);
+window.addEventListener("DOMContentLoaded", () => {
+  initAllScratchTiles();
+
+  // ✅ OCULTAR BOTÓN "ENVIAR RESULTADOS" AL INICIO
+  document.getElementById("sendResultsBtn").style.display = "none";
+});
 
 
 
@@ -505,13 +547,16 @@ function finalizeGame(){
     bestCount, bestValue, prizeWon, outcome: boardPlan.outcome
   };
 
+
   consumeAttempt(tokenParam, prizeWon, detail);
   updateTokenDisplay();
 
-  statusEl.innerHTML = `${message}<br><small>Premios acumulados: ${getTokenState(tokenParam).prizes.reduce((a,b)=>a+b,0)} 💎</small>`;
+  const totalPremios = SHEET_STATE.prizes.reduce((a,b)=>a+b,0);
+  statusEl.innerHTML = `${message}<br><small>Premios acumulados: ${totalPremios} 💎</small>`;
+
 
   // if still have attempts, auto reset board immediately so user can play (no waiting)
-  if(getTokenState(tokenParam).attemptsUsed < getTokenState(tokenParam).attemptsTotal){
+  if(SHEET_STATE.intentosUsados < SHEET_STATE.intentosTotal){
     setTimeout(()=> startNewAttempt(), 1200);
   } else {
     // no more attempts -> show summary and keep board disabled
@@ -519,11 +564,37 @@ function finalizeGame(){
   }
 }
 
-function showSummaryAndFinish(){
-  const s = getTokenState(tokenParam);
-  const total = s.prizes.reduce((a,b)=>a+b,0);
-  statusEl.innerHTML += `<br><strong>Resumen final:</strong> ${total} 💎`;
+
+
+function consumeAttempt(t, prize, detail){
+  SHEET_STATE.intentosUsados++;
+  SHEET_STATE.puntos = Math.max(0, SHEET_STATE.puntos - 5);
+  SHEET_STATE.prizes.push(prize);
+  SHEET_STATE.history.push(detail);
 }
+
+
+
+
+function showSummaryAndFinish(){
+  const total = SHEET_STATE.prizes.reduce((a,b)=>a+b,0);
+  statusEl.innerHTML += `<br><strong>Resumen final:</strong> ${total} 💎`;
+
+  // ✅ MARCAR TOKEN COMO USADO EN SHEET
+  fetch(`${GAS_URL}?action=useToken&token=${tokenParam}`);
+
+  // ✅ ACTIVAR BOTÓN DINÁMICO SOLO AL FINAL
+  const btn = document.getElementById("sendResultsBtn");
+  btn.style.display = "block";
+
+  if(total > 0){
+    btn.textContent = "📩 Enviar Resultados al Admin";
+  }else{
+    btn.textContent = "❌ Cerrar Juego";
+  }
+}
+
+
 
 /* reset board: not used since we create new attempt automatically */
 function shuffleArray(a){ for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
@@ -586,82 +657,43 @@ function formatAttemptText(item, idx){
 }
 
 function buildFormattedDetails(){
-  const s = getTokenState(tokenParam);
+  const s = SHEET_STATE;
   const nowIso = new Date().toISOString();
   const headerDate = formatTimestamp(nowIso);
+
   let out = `📌 Token del jugador: ${tokenParam}\n📅 Fecha: ${headerDate}\n\n`;
-  const history = (s.history||[]).slice();
+
+  const history = (s.history || []).slice();
+
   if(!history.length){
     out += '— No hay intentos guardados —\n';
     return out;
   }
-  // order: Intento 1 = oldest -> newest
+
   history.forEach((h, i) => {
-    // i starts 0 -> Intento 1
-    const idx = i+1;
+    const idx = i + 1;
     out += formatAttemptText(h, idx) + '\n';
   });
+
+  // ✅ SUMATORIA FINAL DE PREMIOS
+  let totalPremios = 0;
+  (s.prizes || []).forEach(p => {
+    const monto = parseFloat(p) || 0;
+    totalPremios += monto;
+  });
+
+  out += `\n==============================\n`;
+  out += `💰 TOTAL GANADO: ${totalPremios} 💎\n`;
+  out += `==============================`;
+
   return out.trim();
 }
 
+
+
+
 /* sendResults: intenta EmailJS (automático) o fallback a mailto/wa */
-async function sendResults(){
-  try{
-    const detailsText = buildFormattedDetails();
 
-    // Si ADMIN_SEND_URL está configurado, intenta enviarlo ahí primero
-    if(ADMIN_SEND_URL){
-      try{
-        await fetch(ADMIN_SEND_URL, {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ token: tokenParam, details: detailsText })
-        });
-        alert('Resultados enviados al administrador (endpoint).');
-        return;
-      }catch(e){
-        console.warn('Error enviando al endpoint', e);
-      }
-    }
-
-    // -------- EMAILJS AUTOMÁTICO --------
-    try{
-      await emailjs.send("service_2hz94wg", "template_c75ox98", {
-        token: tokenParam,
-        details: detailsText
-      });
-
-      alert('📩 Resultados enviados correctamente al administrador.');
-      return;
-
-    }catch(emailErr){
-      console.warn('EmailJS falló:', emailErr);
-    }
-
-    // -------- FALLBACK (solo si EmailJS falla) --------
-    const bodyEncoded = encodeURIComponent(detailsText);
-    const wa = `https://wa.me/${WHATSAPP_NUMBER.replace(/\D/g,'')}?text=${encodeURIComponent('Hola, te comparto mi resultado. Token: '+tokenParam + '\n\n' + detailsText)}`;
-    const mailto = `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent('Resultados Kovra Lucky — Token '+tokenParam)}&body=${bodyEncoded}`;
-
-    const win = window.open('', '_blank');
-    win.document.write(`
-      <div style="background:#07142a;padding:18px;min-height:100vh;color:#fff;font-family:Inter">
-        <h2 style="color:var(--accent)">Enviar resultados</h2>
-        <p>Puedes copiar/pegar el detalle o usar una de las opciones:</p>
-        <p style="white-space:pre-wrap;background:#05060a;padding:12px;border-radius:8px;">${escapeHtml(detailsText)}</p>
-        <p style="margin-top:12px">
-          <a href="${wa}" target="_blank" style="display:inline-block;padding:10px 14px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#041022;border-radius:8px;text-decoration:none;font-weight:800;margin-right:8px">Enviar por WhatsApp</a>
-          <a href="${mailto}" target="_blank" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#0b1220;color:var(--accent);text-decoration:none;font-weight:800">Enviar por Correo</a>
-        </p>
-      </div>
-    `);
-    win.document.close();
-
-  }catch(err){
-    alert('Error al preparar/enviar resultados: '+(err.message||err));
-    console.error(err);
-  }
-}
 
 
 /* small helper to escape HTML for preview window */
@@ -684,7 +716,30 @@ document.getElementById('helpBtn').addEventListener('click', ()=>{ alert('Rasca 
 document.getElementById('shareBtn').addEventListener('click', ()=>{ const link = location.origin + location.pathname + '?token=' + tokenParam; navigator.clipboard.writeText(link).then(()=> alert('Enlace copiado al portapapeles:\n' + link)); });
 
 /* enviar results button binding */
-document.getElementById('sendResultsBtn').addEventListener('click', ()=>{ sendResults(); });
+document.getElementById("sendResultsBtn").addEventListener("click", () => {
+
+  const total = getTotalPremios();
+  const details = buildFormattedDetails();
+
+  if(total > 0){
+    // ✅ ENVÍA CORREO CON CONTENIDO REAL
+    emailjs.send("service_2hz94wg", "template_c75ox98", {
+      details: details   // 🔥 ESTE NOMBRE DEBE COINCIDIR EN EMAILJS
+    }).then(() => {
+      showThanksScreen(total);
+    }).catch(() => {
+      alert("No se pudo enviar automáticamente. Intenta por WhatsApp.");
+      showThanksScreen(total);
+    });
+
+  } else {
+    // ✅ NO GANÓ NADA → SOLO MENSAJE MOTIVADOR
+    showThanksScreen(0);
+  }
+
+});
+
+
 
 /* capture button -> muestra ventana con el detalle (vista previa) */
 document.getElementById('captureBtn').addEventListener('click', ()=> {
@@ -699,9 +754,77 @@ document.getElementById('captureBtn').addEventListener('click', ()=> {
 });
 
 /* history render */
-function renderHistory(){ const s = getTokenState(tokenParam); const el = document.getElementById('history'); if(!s.history || !s.history.length){ el.innerHTML = '<div class="muted">Aún no has jugado.</div>'; return; } let html = '<pre>'; s.history.slice().forEach((h,i)=>{ const picks = h.picks.map(p=>`${p.value}💎`).join(' | '); html += `• ${i+1}: ${picks} | ${h.bestCount} aciertos | Premio: ${h.prizeWon || h.prizeWon===0? h.prizeWon : ''}💎\n`; }); html += '</pre>'; el.innerHTML = html; }
+function renderHistory(){
+  const el = document.getElementById('history');
+  if(!SHEET_STATE.history.length){
+    el.innerHTML = '<div class="muted">Aún no has jugado.</div>';
+    return;
+  }
+
+  let html = '<pre>';
+  SHEET_STATE.history.forEach((h,i)=>{
+    const picks = h.picks.map(p=>`${p.value}💎`).join(' | ');
+    html += `• ${i+1}: ${picks} | ${h.bestCount} aciertos | Premio: ${h.prizeWon}💎\n`;
+  });
+  html += '</pre>';
+  el.innerHTML = html;
+}
 
 renderHistory();
+
+
+
+
+
+
+
+
+
+
+
+
+function showThanksScreen(totalPremios){
+  const screen = document.getElementById("thanksScreen");
+  const title = document.getElementById("thanksTitle");
+  const message = document.getElementById("thanksMessage");
+
+  if(totalPremios > 0){
+    title.innerHTML = "💎 ¡Gracias por preferir Kovra!";
+    message.innerHTML = `
+      Donde premiamos tu fidelidad con diamantes reales. <br><br>
+      🎉 Hoy ganaste <b>${totalPremios} 💎</b> <br><br>
+      Sigue participando, porque en Kovra la suerte siempre vuelve.
+    `;
+  }else{
+    title.innerHTML = "🍀 Hoy no fue tu día...";
+    message.innerHTML = `
+      Pero recuerda que la suerte cambia en cada intento. <br><br>
+      🔁 No te rindas, la próxima jugada puede ser la ganadora. <br><br>
+      Gracias por confiar en Kovra y seguir participando.
+    `;
+  }
+
+  screen.style.display = "flex";
+}
+
+
+
+function getTotalPremios(){
+  let total = 0;
+  (SHEET_STATE.prizes || []).forEach(p => {
+    total += parseFloat(p) || 0;
+  });
+  return total;
+}
+
+
+
+
+
+
+
+
+
 
 </script>
 
@@ -712,6 +835,49 @@ renderHistory();
     emailjs.init("CpWzPvZWNh_Lr3in4"); // PUBLIC KEY (ya proporcionada)
   })();
 </script>
+
+
+
+
+
+
+
+
+
+<div id="thanksScreen" style="
+  position:fixed;
+  inset:0;
+  background:linear-gradient(180deg,#050a18,#02040c);
+  color:white;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:99999;
+  text-align:center;
+  padding:24px;
+">
+
+  <div style="
+    max-width:500px;
+    background:rgba(255,255,255,0.04);
+    border-radius:18px;
+    padding:28px;
+    box-shadow:0 0 40px rgba(124,255,178,0.15);
+    border:1px solid rgba(255,255,255,0.08);
+  ">
+
+    <h1 id="thanksTitle" style="color:#7cffb2;margin-bottom:14px;"></h1>
+
+    <p id="thanksMessage" style="font-size:16px;line-height:1.6;color:#e9f0ff;"></p>
+
+    <button onclick="location.reload()" class="btn primary" style="margin-top:20px;">
+      🔁 Volver a jugar
+    </button>
+
+  </div>
+</div>
+
+
 
 </body>
 </html>
